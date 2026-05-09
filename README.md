@@ -98,14 +98,16 @@ casing; the @-mention slug is lowercased per GitHub convention and
 rendered as `@prayrequest[bot]`.
 
 - **v0 — Action PoC.** ✅ Shipped. Drop-in workflow, keyword-matched
-  against title, hardcoded verses, auto-bless on PR open. Stays
-  available as the self-host path. See *Try it now (self-host)* below.
+  against title, hardcoded verses. Auto-bless fires when `@prayrequest`
+  appears in PR title or body. Stays available as the self-host path.
+  See *Try it now (self-host)* below.
 - **v2 — Hosted App `@prayrequest`.** ✅ Code shipped, awaiting deploy.
   Cloudflare Workers + TypeScript. Install once at org level, no
-  workflow file required. Auto-bless on PR open, `@prayrequest`
-  summon in any PR comment, `@prayrequest reroll` for an alternate.
-  Verse-selection logic is the same keyword matcher as v0
-  (no LLM yet). Setup and deploy: [`app/README.md`](app/README.md).
+  workflow file required. Auto-bless on PR open *if* `@prayrequest`
+  is in the title or body, `@prayrequest` summon in any PR comment,
+  `@prayrequest reroll` for an alternate. Verse-selection logic is
+  the same keyword matcher as v0 (no LLM yet).
+  Setup and deploy: [`app/README.md`](app/README.md).
 - **v1 — Claude-powered matching.** Deferred. Will replace the
   keyword matcher in `app/src/verse-picker.ts` with a Claude API
   call once App distribution is proven. Same surface, smarter picks.
@@ -134,14 +136,15 @@ No API keys, no secrets, no GitHub App to register. The workflow posts
 via the default `GITHUB_TOKEN` and runs on `ubuntu-latest` with only
 `bash` and `jq` (preinstalled).
 
-Open a PR to test. If the comment doesn't appear, check the Actions
-tab — the most common cause is `pull-requests: write` being disabled
-at the repo or org level.
+Open a PR with `@prayrequest` in the title or body. The workflow fires
+on PR open and posts the verse. If the comment doesn't appear, check
+the Actions tab — the most common cause is `pull-requests: write`
+being disabled at the repo or org level.
 
 ### Configure
 
-**Skip a single PR.** Include `[skip prayrequest]` anywhere in the PR
-title.
+**Trigger.** Auto-bless is opt-in per PR: include `@prayrequest`
+anywhere in the title or body. PRs without it are ignored.
 
 **Skip bot PRs.** Already automatic. Dependabot, Renovate, and other
 `Bot`-type users don't trigger the workflow.

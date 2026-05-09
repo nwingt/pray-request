@@ -75,9 +75,10 @@ Wrangler prints a URL like `https://prayrequest.<your-subdomain>.workers.dev`. G
 ### 4. Install on a repo
 
 From the App's public install page (linked in the App settings), pick a
-test repo. Open a PR — auto-bless fires. Comment `@prayrequest` —
-summon fires. Comment `@prayrequest reroll` — reroll fires (skips the
-last verse the bot posted in this thread).
+test repo. Open a PR with `@prayrequest` somewhere in the title or
+body — auto-bless fires. Or open a normal PR and comment
+`@prayrequest` to summon. Comment `@prayrequest reroll` to skip the
+last verse the bot posted in this thread.
 
 ---
 

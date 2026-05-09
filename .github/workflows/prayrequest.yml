@@ -13,7 +13,6 @@ jobs:
   bless:
     if: >-
       github.event_name == 'pull_request'
-      && !contains(github.event.pull_request.title, '[skip prayrequest]')
       && github.event.pull_request.user.type != 'Bot'
     runs-on: ubuntu-latest
     steps:
@@ -26,10 +25,16 @@ jobs:
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
           PR_ADDITIONS: ${{ github.event.pull_request.additions }}
           PR_CHANGED_FILES: ${{ github.event.pull_request.changed_files }}
         run: |
           set -euo pipefail
+          summon_re='(^|[^[:alnum:]])@prayrequest([^[:alnum:]]|$)'
+          if ! [[ "$PR_TITLE" =~ $summon_re || "${PR_BODY:-}" =~ $summon_re ]]; then
+            echo "no @prayrequest in title or body — skipping auto-bless"
+            exit 0
+          fi
           bash scripts/pick-verse.sh | gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file -
 
   summon:

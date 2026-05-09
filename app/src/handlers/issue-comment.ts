@@ -6,6 +6,7 @@ import {
 	extractRefFromBody,
 } from "../github-api";
 import { pickVerse, formatComment } from "../verse-picker";
+import { SUMMON_PATTERN, REROLL_PATTERN, BOT_LOGIN_PREFIX } from "../summon";
 
 interface IssueCommentEvent {
 	action: string;
@@ -21,10 +22,6 @@ interface IssueCommentEvent {
 	repository: { name: string; owner: { login: string } };
 	installation: { id: number };
 }
-
-const SUMMON_PATTERN = /(^|\s)@prayrequest(\s|$)/i;
-const REROLL_PATTERN = /(^|\s)@prayrequest\s+reroll(\s|$)/i;
-const BOT_LOGIN_PREFIX = "prayrequest";
 
 export async function handleIssueComment(event: IssueCommentEvent, env: Env): Promise<void> {
 	if (event.action !== "created") return;
@@ -52,8 +49,6 @@ export async function handleIssueComment(event: IssueCommentEvent, env: Env): Pr
 			? findLastBotComment(token, owner, repo, issueNumber, BOT_LOGIN_PREFIX)
 			: Promise.resolve(null),
 	]);
-
-	if (pr.title.includes("[skip prayrequest]")) return;
 
 	const excludeRef = last ? (extractRefFromBody(last.body) ?? undefined) : undefined;
 

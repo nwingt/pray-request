@@ -1,12 +1,14 @@
 import { getInstallationToken } from "../github-auth";
 import { postComment } from "../github-api";
 import { pickVerse, formatComment } from "../verse-picker";
+import { SUMMON_PATTERN } from "../summon";
 
 interface PullRequestEvent {
 	action: string;
 	pull_request: {
 		number: number;
 		title: string;
+		body: string | null;
 		additions: number;
 		changed_files: number;
 		user: { type: string };
@@ -20,7 +22,11 @@ export async function handlePullRequest(event: PullRequestEvent, env: Env): Prom
 	if (event.action !== "opened" && event.action !== "ready_for_review") return;
 	if (event.pull_request.draft && event.action === "opened") return;
 	if (event.pull_request.user.type === "Bot") return;
-	if (event.pull_request.title.includes("[skip prayrequest]")) return;
+
+	const summoned =
+		SUMMON_PATTERN.test(event.pull_request.title) ||
+		SUMMON_PATTERN.test(event.pull_request.body ?? "");
+	if (!summoned) return;
 
 	const verse = pickVerse({
 		prTitle: event.pull_request.title,

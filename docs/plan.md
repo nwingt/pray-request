@@ -40,8 +40,9 @@ that matches the energy. No editorial commentary — the verse stands alone.
   localize without rewriting tone.
 - **Low-cost to start.** v0 ships as a single workflow file with no
   infra. v2 graduates to a hosted App when adoption justifies it.
-- **Easy to disable.** Per-repo opt-in, `[skip prayrequest]` in title, or just
-  delete the workflow file.
+- **Opt-in per PR.** Auto-bless only fires when `@prayrequest` appears
+  in the PR title or body. Repos that install the App don't get a
+  verse on every PR — only on the ones that ask for one.
 
 ---
 
@@ -51,7 +52,7 @@ Three trigger modes:
 
 | Mode | Trigger | Behavior |
 |---|---|---|
-| **Auto-bless** | PR opened / ready_for_review | Drop one verse + reference on PR open |
+| **Auto-bless** | PR opened / ready_for_review *with `@prayrequest` in title or body* | Drop one verse + reference on PR open |
 | **Summon** | `@prayrequest` in any PR comment | Reply contextually to the thread |
 | **Reroll** | `@prayrequest reroll` | Generate an alternate verse if the first didn't land |
 
@@ -306,7 +307,7 @@ App is built.
 |---|---|
 | **Religious sensitivity** | Opt-in per repo. Allow alternate quote sources (Tao Te Ching, Sun Tzu, Shakespeare). Verse + reference only — no editorial commentary, so the bot never appears to be mocking the verse or the author. |
 | **Cost runaway** | Daily comment cap per repo. Fallback to curated verse list if API errors. Skip bot-authored PRs. |
-| **Spam fatigue** | `[skip prayrequest]` keyword in title. Per-author opt-out via `.github/prayrequest.yml`. Don't auto-bless on `synchronize` events (only initial open). |
+| **Spam fatigue** | Auto-bless is opt-in per PR (`@prayrequest` must appear in title or body); silent on every PR that doesn't ask for it. Don't auto-bless on `synchronize` events (only initial open). |
 | **Verse repetition** | Track recently-used verses per repo, dampen reuse within N PRs. |
 | **LLM hallucination of verses** | Validate Claude's output against a known verse index; fall back to curated list if reference doesn't exist. |
 | **Verse–context mismatch** | Maintain a small eval set of PR scenarios + expected verse category; run before each prompt change. |

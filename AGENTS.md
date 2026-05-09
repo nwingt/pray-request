@@ -32,7 +32,7 @@ Three trigger modes share **one workflow file**, dispatched by event type:
 
 | Mode        | Event                                          | Behavior                          |
 |-------------|------------------------------------------------|-----------------------------------|
-| Auto-bless  | `pull_request: [opened, ready_for_review]`     | Drop verse on PR open             |
+| Auto-bless  | `pull_request: [opened, ready_for_review]` with `@prayrequest` in title or body | Drop verse on PR open |
 | Summon      | `issue_comment: [created]` containing `@PrayRequest`        | Reply contextually to the thread  |
 | Reroll      | `issue_comment` containing `@PrayRequest reroll`            | Generate an alternate verse       |
 
@@ -47,7 +47,7 @@ Three trigger modes share **one workflow file**, dispatched by event type:
 These are decisions already made — do **not** revisit without explicit user direction:
 
 - **App is the default, Action is the fallback.** v0/v1 used the Action because it had no infra; v2 ships the hosted App (`app/`, Cloudflare Workers) so users no longer need a workflow file in their repo. The Action stays in tree as the self-host path — same verse-selection logic, same JSON file.
-- **Opt-in per repo**, plus `[skip prayrequest]` in PR title and skip bot-authored PRs (Dependabot, Renovate). Religious sensitivity → never on by default for someone else's repo.
+- **Opt-in per repo** (install/file presence) **and per PR** (`@prayrequest` must appear in PR title or body for auto-bless to fire; comment summon is always explicit). Skip bot-authored PRs (Dependabot, Renovate). Religious sensitivity → never on by default for someone else's repo, never on by accident on someone's PR.
 - **Verse + reference only — no editorial commentary.** The bot does not add snark, sass, or interpretation. Readers project their own meaning onto the verse. This is a deliberate product decision (made post-plan): it lowers religious-sensitivity risk and makes the bot localizable without rewriting tone.
 - **Don't auto-bless on `synchronize` events** — only initial open — to avoid spam on every push.
 - **Cost ceiling: ~$0.002/PR** with prompt caching (verse-only output is cheaper than the original verse + sass spec). Sonnet 4.6 is default; Haiku is the explicit cost-mode fallback. A daily per-repo comment cap is required to prevent runaway cost.
