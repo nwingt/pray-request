@@ -1,0 +1,76 @@
+name: PrayRequest
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  bless:
+    if: >-
+      !contains(github.event.pull_request.title, '[skip prayrequest]')
+      && github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Pick verse
+        id: pick
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_ADDITIONS: ${{ github.event.pull_request.additions }}
+          PR_CHANGED_FILES: ${{ github.event.pull_request.changed_files }}
+        run: |
+          set -euo pipefail
+
+          verses_file=".github/prayrequest-verses.json"
+          title_lc=$(printf '%s' "$PR_TITLE" | tr '[:upper:]' '[:lower:]')
+
+          match=""
+
+          # Massive-diff override: refactor verse for big PRs
+          if [ "${PR_ADDITIONS:-0}" -gt 500 ] || [ "${PR_CHANGED_FILES:-0}" -gt 20 ]; then
+            match=$(jq -c '.verses[] | select(.tags | index("massive"))' "$verses_file" | head -n 1)
+          fi
+
+          # Tag keyword match in title; first verse with any matching tag wins
+          if [ -z "$match" ]; then
+            count=$(jq '.verses | length' "$verses_file")
+            for i in $(seq 0 $((count - 1))); do
+              tags=$(jq -r ".verses[$i].tags[]" "$verses_file")
+              for tag in $tags; do
+                if printf '%s' "$title_lc" | grep -qE "(^|[^[:alnum:]])${tag}([^[:alnum:]]|$)"; then
+                  match=$(jq -c ".verses[$i]" "$verses_file")
+                  break 2
+                fi
+              done
+            done
+          fi
+
+          # Default fallback
+          if [ -z "$match" ]; then
+            match=$(jq -c '.default' "$verses_file")
+          fi
+
+          verse=$(printf '%s' "$match" | jq -r '.verse')
+          ref=$(printf '%s' "$match" | jq -r '.ref')
+
+          {
+            printf 'body<<PRAYEOF\n'
+            printf '🙏 **PrayRequest received.**\n\n'
+            printf '> %s\n' "$verse"
+            printf '> — *%s*\n' "$ref"
+            printf 'PRAYEOF\n'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BODY: ${{ steps.pick.outputs.body }}
+        run: |
+          gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$BODY"
