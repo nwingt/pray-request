@@ -6,20 +6,21 @@ This file provides guidance to AI coding agents (Claude Code, Cursor, Aider, Cod
 
 ## Repository status
 
-**v0 PoC stage.** Source of truth for product intent is `docs/plan.md`. The first working pieces:
+**v2 stage — GitHub App built, no LLM yet.** Source of truth for product intent is `docs/plan.md`. Two coexisting paths:
 
-- `.github/workflows/prayrequest.yml` — single workflow, auto-bless only, fires on `pull_request: [opened, ready_for_review]`. Uses `gh pr comment` with the default `GITHUB_TOKEN`. No LLM yet.
-- `.github/prayrequest-verses.json` — 20 hardcoded verses with tag arrays + a default fallback.
+- **Self-host (v0 Action).** `.github/workflows/prayrequest.yml` + `scripts/pick-verse.sh` + `.github/prayrequest-verses.json`. Pure bash + `jq` on `ubuntu-latest`. Auto-bless + summon, both keyword-matched. Posts via default `GITHUB_TOKEN`. Stays as the self-host fallback.
+- **Hosted App (v2).** `app/` — Cloudflare Workers + TypeScript + Hono. Webhook server reachable at `https://prayrequest.<sub>.workers.dev/webhook`. Auto-bless, `@prayrequest` summon, `@prayrequest reroll`. Same keyword matcher, ported to TS in `app/src/verse-picker.ts`, **importing the same `.github/prayrequest-verses.json`** so behavior matches the Action.
 
-There is no Node/Python project — the workflow is pure bash + `jq` (preinstalled on `ubuntu-latest`). Do **not** invent `npm test` / `pytest` style commands.
+Two project boundaries to keep in mind when editing:
 
-To test v0, push to GitHub and open a PR. There's no useful local test harness; verse-picking logic could be extracted and unit-tested but hasn't been.
+- The **Action** path is pure bash. Do not introduce Node/Python in the repo root or in `scripts/`.
+- The **App** path is a TypeScript Cloudflare Workers project at `app/`. `npm install --ignore-scripts` (sharp's postinstall fails and isn't needed). Tests: `cd app && npx vitest run`. Type check: `cd app && npx tsc --noEmit`. Bundle dry-run: `cd app && npx wrangler deploy --dry-run`.
 
-v1 (next milestone in `docs/plan.md` § Roadmap) layers in the Claude API call, the `@PrayRequest` summon mode, and `@PrayRequest reroll`.
+v1 (LLM-powered verse selection) is **deferred**, not next. The plan now is: prove App distribution works on a real repo, then swap the keyword matcher in `app/src/verse-picker.ts` for a Claude API call. The Action path will likely stay keyword-only as the zero-secret self-host option.
 
 ## What PrayRequest is
 
-A GitHub bot that comments a context-matched Bible verse on every PR — verse + reference only, no commentary. Readers interpret it themselves. Implemented as a **GitHub Action** (not a GitHub App) that calls the Claude API and posts via `gh pr comment` using the default `GITHUB_TOKEN`. See `docs/plan.md` for full pitch, sample interactions, and tradeoff rationale.
+A GitHub bot that comments a context-matched Bible verse on every PR — verse + reference only, no commentary. Readers interpret it themselves. Distributed two ways: as a hosted **GitHub App** (`app/`, the default) and as a self-hostable **GitHub Action** (`.github/workflows/prayrequest.yml`, the zero-secret fallback). See `docs/plan.md` for full pitch, sample interactions, and tradeoff rationale.
 
 ## Architecture (target, per plan)
 
@@ -45,7 +46,7 @@ Three trigger modes share **one workflow file**, dispatched by event type:
 
 These are decisions already made — do **not** revisit without explicit user direction:
 
-- **Action, not App.** Trade-off accepted: ~10s cold-start latency in exchange for zero infra and free `GITHUB_TOKEN` auth.
+- **App is the default, Action is the fallback.** v0/v1 used the Action because it had no infra; v2 ships the hosted App (`app/`, Cloudflare Workers) so users no longer need a workflow file in their repo. The Action stays in tree as the self-host path — same verse-selection logic, same JSON file.
 - **Opt-in per repo**, plus `[skip prayrequest]` in PR title and skip bot-authored PRs (Dependabot, Renovate). Religious sensitivity → never on by default for someone else's repo.
 - **Verse + reference only — no editorial commentary.** The bot does not add snark, sass, or interpretation. Readers project their own meaning onto the verse. This is a deliberate product decision (made post-plan): it lowers religious-sensitivity risk and makes the bot localizable without rewriting tone.
 - **Don't auto-bless on `synchronize` events** — only initial open — to avoid spam on every push.

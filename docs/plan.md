@@ -212,25 +212,36 @@ App is built.
 - Hard-coded list of 20 verses chosen by simple keyword match (no AI)
 - Goal: prove the comment plumbing works
 
-### v1 — Claude-powered matching (2–3 days)
-- Replace keyword matcher with Claude API call (full PR context: title
-  + description + diff shape + signals)
-- All 3 trigger modes (auto / summon / reroll), still workflow-based
-- `[skip prayrequest]` opt-out via PR title
-- Skip bot-authored PRs (Dependabot, Renovate)
-
-### v2 — Hosted GitHub App: `@prayrequest` (1–2 weeks)
+### v2 — Hosted GitHub App: `@prayrequest` ✅ (code; deploy pending)
 - The actual product. Install once at org level, no per-repo workflow
   file required.
-- `@prayrequest` mention in any PR thread → contextual verse reply
-- `@prayrequest reroll` → alternate verse
-- Auto-bless on PR open if enabled in App config
-- **Request-review as trigger** — add `@prayrequest` as a reviewer
-  on a PR, respond on `pull_request: [review_requested]`. (Underlying
-  API supports this for any App; UI sidebar prominence may stay
-  Copilot-only. To be confirmed.)
-- Webhook server, App auth (private key + installation tokens)
+- `app/` — Cloudflare Workers + TypeScript + Hono. Webhook handler
+  verifies `X-Hub-Signature-256`, mints installation tokens, posts
+  via the App's bot identity.
+- Auto-bless on `pull_request: [opened, ready_for_review]`
+- `@prayrequest` mention in any PR comment → summon
+- `@prayrequest reroll` → walks the issue's comments, finds the bot's
+  last verse, excludes it from the next pick
+- **No LLM yet** — same keyword matcher as v0, ported to TypeScript
+  in `app/src/verse-picker.ts`, importing the same
+  `.github/prayrequest-verses.json`. Action and App behave identically.
 - Action remains available as the self-host path
+- Open: **Request-review as trigger** — add `@prayrequest` as a
+  reviewer, respond on `pull_request: [review_requested]`.
+  Underlying API supports this for any App; UI sidebar prominence
+  may stay Copilot-only. To be confirmed.
+
+### v1 — Claude-powered matching (deferred until App distribution proven)
+- Replace `pickVerse` in `app/src/verse-picker.ts` with a Claude API
+  call (full PR context: title + description + diff shape + signals)
+- Validate Claude's output against the curated verse JSON to guard
+  against hallucinated references; fall back to keyword matcher on
+  API failure or invalid response
+- Same surface (auto-bless, summon, reroll), smarter picks
+- The Action path likely stays keyword-only as the zero-secret
+  self-host option — flipping it to LLM would require users to set
+  `ANTHROPIC_API_KEY` in repo secrets, defeating the "drop in two
+  files" pitch.
 
 ### v3 — Polish (open-ended)
 - React-emoji feedback loop (👍/👎 → log to PostHog)
@@ -338,8 +349,12 @@ App is built.
 
 ## Next Step
 
-v0 ✅ shipped. Next is v1: swap the keyword matcher for a Claude API
-call so the verse selection uses full PR context (title + description
-+ diff shape + signals) instead of title keywords. Still workflow-
-based; keeps the zero-infra story for the self-host path while v2 (the
-hosted App) is built in parallel.
+v0 ✅ shipped (Action). v2 ✅ code-shipped (App at `app/`, no LLM yet).
+Next: deploy the App to Cloudflare, register the GitHub App entry,
+install on a test repo, and validate auto-bless / summon / reroll
+end-to-end. Setup checklist in [`app/README.md`](../app/README.md).
+
+Once distribution is proven, v1 layers in: swap the `pickVerse`
+keyword matcher in `app/src/verse-picker.ts` for a Claude API call
+with full PR context. The Action stays keyword-only so its
+zero-secret pitch survives.

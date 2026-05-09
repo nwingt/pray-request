@@ -93,37 +93,36 @@ When *not* to use:
 
 The product is a hosted GitHub App, **PrayRequest** — install once at
 the org level, no workflow file, summon in any PR thread with
-`@prayrequest`. That's not built yet. Right now what exists is a v0
-Action you can self-host. (The GitHub username `prayrequest` is
-unclaimed as of this writing; the App's display name keeps the
-"PrayRequest" casing, while the @-mention slug is lowercased per
-GitHub convention and rendered as `@prayrequest[bot]`.)
+`@prayrequest`. The App's display name keeps the "PrayRequest"
+casing; the @-mention slug is lowercased per GitHub convention and
+rendered as `@prayrequest[bot]`.
 
 - **v0 — Action PoC.** ✅ Shipped. Drop-in workflow, keyword-matched
-  against title, hardcoded verses, auto-bless on PR open. Self-host
-  path; not the long-term distribution. See *Try it now* below.
-- **v1 — Claude-powered matching.** Replace the keyword matcher with
-  the Claude API for context-aware verse selection (title +
-  description + diff shape). Still workflow-based.
-- **v2 — Hosted App `@prayrequest`.** The actual product. Install
-  once at org level. Auto-bless on PR open, `@prayrequest` summon
-  in any PR comment, `@prayrequest reroll` for an alternate.
-  Likely also responds when added as a reviewer (the same way
-  CodeRabbit and Greptile do — to be confirmed against GitHub App
-  reviewer-permission docs).
+  against title, hardcoded verses, auto-bless on PR open. Stays
+  available as the self-host path. See *Try it now (self-host)* below.
+- **v2 — Hosted App `@prayrequest`.** ✅ Code shipped, awaiting deploy.
+  Cloudflare Workers + TypeScript. Install once at org level, no
+  workflow file required. Auto-bless on PR open, `@prayrequest`
+  summon in any PR comment, `@prayrequest reroll` for an alternate.
+  Verse-selection logic is the same keyword matcher as v0
+  (no LLM yet). Setup and deploy: [`app/README.md`](app/README.md).
+- **v1 — Claude-powered matching.** Deferred. Will replace the
+  keyword matcher in `app/src/verse-picker.ts` with a Claude API
+  call once App distribution is proven. Same surface, smarter picks.
 - **v3 — Polish.** Alternate quote sources (Tao Te Ching, Sun Tzu,
   Shakespeare for non-religious teams), per-repo `prayrequest.yml`
   config, verse-fatigue dampening, 👍/👎 reaction feedback loop,
-  Marketplace listing.
+  daily comment cap, Marketplace listing.
 
 Full design and rationale: [`docs/plan.md`](docs/plan.md).
 
 ---
 
-## Try It Now (v0 self-host)
+## Try It Now (self-host)
 
-Until the App ships, you can run the keyword-matched PoC by dropping
-two files into your repo:
+If you don't want to install the hosted App, you can run the same
+keyword-matched logic as a self-hosted Action by dropping two files
+into your repo:
 
 ```
 .github/
