@@ -16,7 +16,7 @@ readers interpret it however they want.
 | **What** | GitHub bot that comments a Bible verse on PRs, matched to the PR's context |
 | **Why** | Team's YOLO-PR culture has no artifact. Canonize the vibe. |
 | **How** | GitHub Action → Claude API → `gh pr comment` |
-| **Cost** | ~$0.005 per PR. ~$5/month at 1,000 PRs. |
+| **Cost** | ~$0.002 per PR. ~$2/month at 1,000 PRs. |
 | **Build effort** | PoC in 1 day. MVP in 2–3 days. |
 | **Risk** | Religious sensitivity → opt-in per repo, alternate quote sources optional. |
 
@@ -38,8 +38,8 @@ that matches the energy. No editorial commentary — the verse stands alone.
 - **No commentary, no offense.** Verse + reference only. The reader does the
   interpretation. Lowers religious-sensitivity risk and makes the bot easy to
   localize without rewriting tone.
-- **Low-cost to build.** One Action + one API call. No server, no webhook,
-  no GitHub App registration.
+- **Low-cost to start.** v0 ships as a single workflow file with no
+  infra. v2 graduates to a hosted App when adoption justifies it.
 - **Easy to disable.** Per-repo opt-in, `[skip prayrequest]` in title, or just
   delete the workflow file.
 
@@ -52,12 +52,12 @@ Three trigger modes:
 | Mode | Trigger | Behavior |
 |---|---|---|
 | **Auto-bless** | PR opened / ready_for_review | Drop one verse + reference on PR open |
-| **Summon** | `@PrayRequest` in any PR comment | Reply contextually to the thread |
-| **Reroll** | `@PrayRequest reroll` | Generate an alternate verse if the first didn't land |
+| **Summon** | `@prayrequest` in any PR comment | Reply contextually to the thread |
+| **Reroll** | `@prayrequest reroll` | Generate an alternate verse if the first didn't land |
 
 Optional future modes:
 - **Last rites** — verse on merge ("rest in peace, prod")
-- **Point-blessing** — `@PrayRequest bless @reviewer` to bless someone else
+- **Point-blessing** — `@prayrequest bless @reviewer` to bless someone else
 - **Daily verse** — scheduled team-wide verse via repo discussions
 
 ---
@@ -144,23 +144,41 @@ predictable and non-random.
 | Trigger / runtime | **GitHub Actions** | Free for public repos, generous private quota, no infra |
 | Comment posting | **`gh` CLI** | Uses default `GITHUB_TOKEN`, zero auth setup |
 | LLM | **Claude API** (sonnet-4-6 default, haiku-4-5 for cost mode) | Better vibe-matching than smaller models, prompt caching cuts cost |
-| Verse fallback | **Curated JSON** of ~50 pre-tagged verses | Used if API fails or rate-limited |
+| Verse fallback | **Curated JSON** of ~20 pre-tagged verses + default | Used if API fails or rate-limited |
 | Config | `.github/prayrequest.yml` per repo | Verse language, opt-out paths, alternate quote sources |
 | Optional analytics | **PostHog** | Track 👍/👎 reactions to learn which verses land |
 
-### Why not a real GitHub App?
+### Action vs GitHub App
 
-Considered. Trade-off:
+Both have a place. Trade-off:
 
 | | GitHub Action | GitHub App |
 |---|---|---|
-| Setup | Drop a workflow file | Register app, host server, handle webhooks |
+| Setup | Drop a workflow file per repo | Install once at org level |
+| Distribution | Self-host / Marketplace publish | `@prayrequest` install link |
 | Latency | ~10s (runner cold start) | sub-second |
-| Auth | Free with `GITHUB_TOKEN` | Manage app secrets, install per org |
+| Auth | Free with `GITHUB_TOKEN` | Manage app secrets, host server |
 | Cost | Free at small scale | Hosting + ops |
+| Summon UX | Workflow listens on `issue_comment` | Native `@mention`, request-review |
 
-**Verdict:** start as Action. If we hit a latency problem (we won't — it's a
-joke bot), graduate to App later.
+**Verdict:** v0/v1 ship as an Action because it's faster to build and
+proves out the verse-matching logic with zero infra. **v2 graduates to
+a hosted GitHub App (`@prayrequest`)** because that's how teams
+actually adopt review-bots — install once, no per-repo workflow file,
+@-mention or add-as-reviewer to summon. The Action stays available as
+the self-host path.
+
+#### Request-review as a trigger
+
+GitHub Apps can be added to `requested_reviewers` and respond on
+`pull_request: [review_requested]`, the same way CodeRabbit and
+Greptile do. So `@prayrequest` could plausibly work both as an
+@-mention summon and as a "add the bot as a reviewer" target. The UI
+affordance of *appearing in the reviewer picker* without typing is
+currently a Copilot-only privilege (first-party integration), but the
+underlying API capability exists for any App with the right
+permissions. Worth confirming against GitHub docs before locking the
+v2 spec.
 
 ---
 
@@ -184,28 +202,42 @@ A Haiku-only "cost mode" cuts this by ~5×.
 
 ## Roadmap
 
-### v0 — PoC (½ day)
+The realistic adoption path is the **hosted `@prayrequest` GitHub
+App** — install once at the org level, no workflow file. The Action
+is the bootstrap PoC and the long-term self-host fallback while the
+App is built.
+
+### v0 — Action PoC (½ day) ✅
 - Single workflow, auto-bless only
 - Hard-coded list of 20 verses chosen by simple keyword match (no AI)
 - Goal: prove the comment plumbing works
 
-### v1 — MVP (2–3 days)
-- Claude-powered verse matching with full PR context
-- All 3 trigger modes (auto / summon / reroll)
+### v1 — Claude-powered matching (2–3 days)
+- Replace keyword matcher with Claude API call (full PR context: title
+  + description + diff shape + signals)
+- All 3 trigger modes (auto / summon / reroll), still workflow-based
 - `[skip prayrequest]` opt-out via PR title
 - Skip bot-authored PRs (Dependabot, Renovate)
 
-### v2 — Smart (1 week)
+### v2 — Hosted GitHub App: `@prayrequest` (1–2 weeks)
+- The actual product. Install once at org level, no per-repo workflow
+  file required.
+- `@prayrequest` mention in any PR thread → contextual verse reply
+- `@prayrequest reroll` → alternate verse
+- Auto-bless on PR open if enabled in App config
+- **Request-review as trigger** — add `@prayrequest` as a reviewer
+  on a PR, respond on `pull_request: [review_requested]`. (Underlying
+  API supports this for any App; UI sidebar prominence may stay
+  Copilot-only. To be confirmed.)
+- Webhook server, App auth (private key + installation tokens)
+- Action remains available as the self-host path
+
+### v3 — Polish (open-ended)
 - React-emoji feedback loop (👍/👎 → log to PostHog)
 - Verse-fatigue dampening (don't repeat same verse within N PRs)
 - Per-repo config (`.github/prayrequest.yml`): language, alternate quote
   sources (Tao Te Ching, Sun Tzu, Shakespeare for non-religious teams)
-
-### v3 — Public (open-ended)
-- Publish to GitHub Marketplace as a reusable Action
-- Landing page, docs, examples
-- Optional: managed-hosted version as a real GitHub App for orgs that want
-  zero setup
+- Publish App on Marketplace, landing page, docs
 
 ---
 
@@ -214,34 +246,34 @@ A Haiku-only "cost mode" cuts this by ~5×.
 ### Friday 6:47pm hotfix
 **PR:** `hotfix: payment gateway timeout (URGENT)` — +3 / −1, no tests
 
-> 🙏 **PrayRequest received.**
->
-> > 「人若賺得全世界，賠上自己的生命，有甚麼益處呢？」
+> > 人若賺得全世界，賠上自己的生命，有甚麼益處呢？
 > > — *馬太福音 16:26*
+>
+> *— 🙏 PrayRequest*
 
 ### Massive refactor
 **PR:** `refactor: rewrite auth module` — +2,847 / −3,102, 30 files
 
-> 🙏 **PrayRequest received.**
->
-> > 「看哪，我將一切都更新了。」
+> > 看哪，我將一切都更新了。
 > > — *啟示錄 21:5*
+>
+> *— 🙏 PrayRequest*
 
 ### No tests added
 **PR:** `feat: add user export to CSV` — +312 / −4, 0 test files
 
-> 🙏 **PrayRequest received.**
->
-> > 「信心若沒有行為就是死的。」
+> > 信心若沒有行為就是死的。
 > > — *雅各書 2:17*
+>
+> *— 🙏 PrayRequest*
 
 ### Security path touched
 **PR:** `fix: bypass JWT check for internal calls` — touches `middleware/auth.ts`
 
-> 🙏 **PrayRequest received.**
->
-> > 「若不是耶和華看守城池，看守的人就枉然儆醒。」
+> > 若不是耶和華看守城池，看守的人就枉然儆醒。
 > > — *詩篇 127:1*
+>
+> *— 🙏 PrayRequest*
 
 ### TODO debt
 **Diff:**
@@ -250,10 +282,10 @@ A Haiku-only "cost mode" cuts this by ~5×.
 + // FIXME: this is a hack, refactor later
 ```
 
-> 🙏 **PrayRequest received.**
->
-> > 「掩蓋自己罪過的，必不亨通；承認且離棄罪過的，必蒙憐恤。」
+> > 掩蓋自己罪過的，必不亨通；承認且離棄罪過的，必蒙憐恤。
 > > — *箴言 28:13*
+>
+> *— 🙏 PrayRequest*
 
 ---
 
@@ -272,14 +304,15 @@ A Haiku-only "cost mode" cuts this by ~5×.
 
 ## Open Questions
 
-1. **Public Marketplace Action or internal-only?** Public maximizes reach but
-   raises support burden.
-2. **Default language: English, Cantonese, or bilingual?** Bilingual is the
+1. **Default language: English, Cantonese, or bilingual?** Bilingual is the
    most "us" but verbose in comments.
-3. **Should it bless reviewers too, or only authors?** Reviewer-blessing is
+2. **Should it bless reviewers too, or only authors?** Reviewer-blessing is
    funnier but adds noise.
-4. **Self-host the LLM call vs use Anthropic API directly from the Action?**
+3. **Self-host the LLM call vs use Anthropic API directly from the Action?**
    Direct is simpler; self-hosted gives caching/rate-limit control.
+4. **App reviewer integration**: confirm `requested_reviewers` works for a
+   third-party App without Copilot-tier UI privileges. If yes, advertise
+   "add `@prayrequest` as a reviewer" as a first-class summon mode.
 
 ---
 
@@ -292,20 +325,21 @@ A Haiku-only "cost mode" cuts this by ~5×.
 - **"For when `LGTM` isn't enough."**
 - **「合併之前，先讀一段。」**
 
-### Bot reply opener template
+### Comment format
 
 ```
-🙏 **PrayRequest received.**
-
-> *[verse]*
+> [verse]
 > — *[reference]*
+
+*— 🙏 PrayRequest*
 ```
 
 ---
 
 ## Next Step
 
-Build v0 PoC: a single `.github/workflows/prayrequest.yml` that auto-comments one
-of 20 hardcoded verses on PR open, keyword-matched. ~2 hours of work. Drops
-into any repo as a single file. Use it as the demo for team buy-in before
-investing in v1.
+v0 ✅ shipped. Next is v1: swap the keyword matcher for a Claude API
+call so the verse selection uses full PR context (title + description
++ diff shape + signals) instead of title keywords. Still workflow-
+based; keeps the zero-infra story for the self-host path while v2 (the
+hosted App) is built in parallel.
