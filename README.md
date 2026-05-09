@@ -13,24 +13,24 @@ interpret it however they want.
 
 A `hotfix:` PR gets:
 
-> 🙏 **PrayRequest received.**
->
-> > 「人若賺得全世界，賠上自己的生命，有甚麼益處呢？」
+> > 人若賺得全世界，賠上自己的生命，有甚麼益處呢？
 > > — *馬太福音 16:26*
+>
+> *— 🙏 PrayRequest*
 
 A `refactor:` PR (or any 500+ line diff) gets:
 
-> 🙏 **PrayRequest received.**
->
-> > 「看哪，我將一切都更新了。」
+> > 看哪，我將一切都更新了。
 > > — *啟示錄 21:5*
+>
+> *— 🙏 PrayRequest*
 
 A `feat:` PR gets:
 
-> 🙏 **PrayRequest received.**
->
-> > 「神看著一切所造的都甚好。」
+> > 神看著一切所造的都甚好。
 > > — *創世記 1:31*
+>
+> *— 🙏 PrayRequest*
 
 The full title-tag-to-verse mapping lives in
 [`.github/prayrequest-verses.json`](.github/prayrequest-verses.json).

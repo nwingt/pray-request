@@ -60,9 +60,9 @@ jobs:
 
           {
             printf 'body<<PRAYEOF\n'
-            printf '🙏 **PrayRequest received.**\n\n'
             printf '> %s\n' "$verse"
             printf '> — *%s*\n' "$ref"
+            printf '\n*— 🙏 PrayRequest*\n'
             printf 'PRAYEOF\n'
           } >> "$GITHUB_OUTPUT"
 
