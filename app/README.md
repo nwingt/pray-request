@@ -2,12 +2,10 @@
 
 The hosted Worker that powers the `@prayrequest` bot. Cloudflare Workers
 + TypeScript + Hono. Receives GitHub webhooks, picks a verse via the
-keyword matcher (shared with the v0 self-host workflow), and posts a
-comment as the App's bot user.
+keyword matcher, and posts a comment as the App's bot user.
 
-> No LLM yet. Same verse-selection logic as `scripts/pick-verse.sh`,
-> ported to TypeScript. Behavior is intentionally identical to the
-> Action so the Action remains a viable self-host fallback.
+> No LLM yet. v1 will swap `pickVerse` in `src/verse-picker.ts` for a
+> Claude API call.
 
 ---
 
@@ -19,7 +17,7 @@ comment as the App's bot user.
 | `src/verify.ts` | HMAC-SHA256 verification of `X-Hub-Signature-256` |
 | `src/github-auth.ts` | App JWT (RS256 via `jose`) → installation token, with per-isolate cache |
 | `src/github-api.ts` | `postComment`, `findLastBotComment`, `getPullRequest`, `extractRefFromBody` |
-| `src/verse-picker.ts` | TypeScript port of `pick-verse.sh`. Imports `../../.github/prayrequest-verses.json` directly so the Action and App stay in sync. |
+| `src/verse-picker.ts` | Loads `../../.github/prayrequest-verses.json` and matches PR title against tag arrays (word-boundary, JSON-order priority, massive-diff override). |
 | `src/handlers/pull-request.ts` | Auto-bless on `opened` / `ready_for_review` |
 | `src/handlers/issue-comment.ts` | `@prayrequest` summon, `@prayrequest reroll` |
 | `test/index.spec.ts` | Verse-picker parity tests (vitest) |
@@ -113,8 +111,8 @@ npx smee-client --url https://smee.io/<your-channel> --target http://localhost:8
 npx vitest run
 ```
 
-Verse-picker tests verify parity with `pick-verse.sh` (massive override,
-word-boundary matching, default fallback, reroll-exclude).
+Verse-picker tests cover the matcher's behavior: massive override,
+word-boundary matching, default fallback, reroll-exclude.
 
 ---
 

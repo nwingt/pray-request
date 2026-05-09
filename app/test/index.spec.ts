@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { pickVerse, formatComment } from "../src/verse-picker";
 
-// Parity tests against pick-verse.sh behavior. Refs come from
-// .github/prayrequest-verses.json.
+// Refs come from .github/prayrequest-verses.json.
 
 describe("pickVerse", () => {
 	it("massive override fires when additions > 500", () => {

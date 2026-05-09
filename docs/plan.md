@@ -15,7 +15,7 @@ readers interpret it however they want.
 |---|---|
 | **What** | GitHub bot that comments a Bible verse on PRs, matched to the PR's context |
 | **Why** | Team's YOLO-PR culture has no artifact. Canonize the vibe. |
-| **How** | GitHub Action → Claude API → `gh pr comment` |
+| **How** | GitHub App on Cloudflare Workers → Claude API → POST comment |
 | **Cost** | ~$0.002 per PR. ~$2/month at 1,000 PRs. |
 | **Build effort** | PoC in 1 day. MVP in 2–3 days. |
 | **Risk** | Religious sensitivity → opt-in per repo, alternate quote sources optional. |
@@ -38,8 +38,8 @@ that matches the energy. No editorial commentary — the verse stands alone.
 - **No commentary, no offense.** Verse + reference only. The reader does the
   interpretation. Lowers religious-sensitivity risk and makes the bot easy to
   localize without rewriting tone.
-- **Low-cost to start.** v0 ships as a single workflow file with no
-  infra. v2 graduates to a hosted App when adoption justifies it.
+- **Low-cost to run.** Cloudflare Workers free tier swallows everything
+  pre-viral. ~$0.002/PR for the LLM call once v1 lands.
 - **Opt-in per PR.** Auto-bless only fires when `@prayrequest` appears
   in the PR title or body. Repos that install the App don't get a
   verse on every PR — only on the ones that ask for one.
@@ -67,17 +67,19 @@ Optional future modes:
 
 ```
 ┌─────────────────┐
-│  GitHub PR      │ opened / commented
-│  event          │
+│  GitHub PR /    │ opened / commented
+│  comment event  │
 └────────┬────────┘
          │
          ▼
 ┌─────────────────────────────┐
-│  GitHub Actions runner      │
+│  Cloudflare Worker          │
+│  /webhook                   │
 │                             │
-│  1. Extract context:        │
-│     • title                 │
-│     • description           │
+│  1. Verify HMAC signature   │
+│  2. Mint installation token │
+│  3. Extract context:        │
+│     • title + description   │
 │     • diff stats            │
 │     • file paths touched    │
 │     • signals (no tests,    │
@@ -87,7 +89,7 @@ Optional future modes:
          │
          ▼
 ┌─────────────────────────────┐
-│  Claude API                 │
+│  Claude API (v1)            │
 │  (sonnet-4-6 or haiku-4-5)  │
 │                             │
 │  System prompt asks for:    │
@@ -101,27 +103,21 @@ Optional future modes:
          │
          ▼
 ┌─────────────────────────────┐
-│  gh pr comment              │
-│  (uses GITHUB_TOKEN)        │
+│  POST /repos/:o/:r/         │
+│  issues/:n/comments         │
+│  (installation token)       │
 └─────────────────────────────┘
 ```
 
 ### Trigger detection
 
-```yaml
-on:
-  pull_request:
-    types: [opened, ready_for_review]
-  issue_comment:
-    types: [created]
-```
-
-A single workflow handles both auto and @mention modes. `issue_comment` covers
-PR comments because GitHub treats PRs as a subtype of issues at the API layer.
+The Worker subscribes to `pull_request` and `issue_comment` webhook events.
+It dispatches on `X-GitHub-Event`. PR comments arrive as `issue_comment` because
+GitHub treats PRs as a subtype of issues at the API layer.
 
 ### Signal extraction
 
-Before calling Claude, the Action enriches the PR with cheap heuristic signals
+Before calling Claude, the Worker enriches the PR with cheap heuristic signals
 that bias verse selection:
 
 | Signal | Detection | Vibe |
@@ -142,32 +138,28 @@ predictable and non-random.
 
 | Layer | Choice | Why |
 |---|---|---|
-| Trigger / runtime | **GitHub Actions** | Free for public repos, generous private quota, no infra |
-| Comment posting | **`gh` CLI** | Uses default `GITHUB_TOKEN`, zero auth setup |
+| Trigger / runtime | **Cloudflare Workers** | Free tier, sub-100ms cold start, native WebCrypto for HMAC + RS256 |
+| Web framework | **Hono** | Tiny (~12 KiB), Workers-native routing |
+| GitHub auth | **`jose` for App JWT** + raw `fetch` for token exchange | Two endpoints; Octokit would be overkill |
 | LLM | **Claude API** (sonnet-4-6 default, haiku-4-5 for cost mode) | Better vibe-matching than smaller models, prompt caching cuts cost |
-| Verse fallback | **Curated JSON** of ~20 pre-tagged verses + default | Used if API fails or rate-limited |
-| Config | `.github/prayrequest.yml` per repo | Verse language, opt-out paths, alternate quote sources |
+| Verse fallback | **Curated JSON** of pre-tagged verses + default | Used if API fails, rate-limits, or hallucinates |
+| Config | `.github/prayrequest.yml` per repo (planned) | Verse language, opt-out paths, alternate quote sources |
 | Optional analytics | **PostHog** | Track 👍/👎 reactions to learn which verses land |
 
-### Action vs GitHub App
+### Why an App (not an Action)
 
-Both have a place. Trade-off:
+Earlier drafts shipped as a GitHub Action because it had no infra cost. That
+path is gone — once the App calls the Claude API, it needs `ANTHROPIC_API_KEY`
+anyway, which kills the "drop two files, no secrets" pitch the Action
+existed for. The hosted App is now the only distribution.
 
-| | GitHub Action | GitHub App |
+| | GitHub App on Workers | (former) Action path |
 |---|---|---|
-| Setup | Drop a workflow file per repo | Install once at org level |
-| Distribution | Self-host / Marketplace publish | `@prayrequest` install link |
-| Latency | ~10s (runner cold start) | sub-second |
-| Auth | Free with `GITHUB_TOKEN` | Manage app secrets, host server |
-| Cost | Free at small scale | Hosting + ops |
-| Summon UX | Workflow listens on `issue_comment` | Native `@mention`, request-review |
-
-**Verdict:** v0/v1 ship as an Action because it's faster to build and
-proves out the verse-matching logic with zero infra. **v2 graduates to
-a hosted GitHub App (`@prayrequest`)** because that's how teams
-actually adopt review-bots — install once, no per-repo workflow file,
-@-mention or add-as-reviewer to summon. The Action stays available as
-the self-host path.
+| Setup | Install once at org level | Drop workflow file per repo |
+| Latency | sub-100ms cold start | ~10s runner spin-up |
+| Auth | App JWT → installation token | Default `GITHUB_TOKEN` |
+| LLM secrets | One Cloudflare secret | Per-repo `ANTHROPIC_API_KEY` |
+| Summon UX | `@mention` + (planned) reviewer-add | Workflow listens on `issue_comment` |
 
 #### Request-review as a trigger
 
@@ -194,8 +186,8 @@ Per-PR cost breakdown using Claude Sonnet 4.6 with prompt caching:
 | Output (verse + reference) | ~50 out | $0.0008 |
 | **Per PR** | | **~$0.002** |
 
-At 1,000 PRs/month: **~$2**. At 10,000: ~$20. The Actions runner minutes are
-within most plans' free tier.
+At 1,000 PRs/month: **~$2**. At 10,000: ~$20. Cloudflare Workers free
+tier covers the webhook traffic at this volume.
 
 A Haiku-only "cost mode" cuts this by ~5×.
 
@@ -203,46 +195,39 @@ A Haiku-only "cost mode" cuts this by ~5×.
 
 ## Roadmap
 
-The realistic adoption path is the **hosted `@prayrequest` GitHub
-App** — install once at the org level, no workflow file. The Action
-is the bootstrap PoC and the long-term self-host fallback while the
-App is built.
+### v0 — Action PoC ✅ (archived)
+Bash + jq workflow that proved the comment plumbing. Removed once the
+App took over; the keyword-matching logic moved to TypeScript at
+`app/src/verse-picker.ts` and the verse JSON moved with it.
 
-### v0 — Action PoC (½ day) ✅
-- Single workflow, auto-bless only
-- Hard-coded list of 20 verses chosen by simple keyword match (no AI)
-- Goal: prove the comment plumbing works
-
-### v2 — Hosted GitHub App: `@prayrequest` ✅ (code; deploy pending)
-- The actual product. Install once at org level, no per-repo workflow
-  file required.
+### v2 — Hosted GitHub App: `@prayrequest` ✅
 - `app/` — Cloudflare Workers + TypeScript + Hono. Webhook handler
   verifies `X-Hub-Signature-256`, mints installation tokens, posts
   via the App's bot identity.
-- Auto-bless on `pull_request: [opened, ready_for_review]`
-- `@prayrequest` mention in any PR comment → summon
+- Install once at the org or user level, no per-repo workflow file.
+- Auto-bless on `pull_request: [opened, ready_for_review]` *only when
+  `@prayrequest` is in the PR title or body* (opt-in per PR).
+- `@prayrequest` in any PR comment → summon.
 - `@prayrequest reroll` → walks the issue's comments, finds the bot's
-  last verse, excludes it from the next pick
-- **No LLM yet** — same keyword matcher as v0, ported to TypeScript
-  in `app/src/verse-picker.ts`, importing the same
-  `.github/prayrequest-verses.json`. Action and App behave identically.
-- Action remains available as the self-host path
+  last verse, excludes it from the next pick (matched via hidden HTML
+  comment anchor `<!-- prayrequest:ref=… -->`).
+- **No LLM yet** — keyword matcher with word-boundary tag matching
+  against PR title, JSON-order priority, and a `massive`-tag override
+  for big diffs.
 - Open: **Request-review as trigger** — add `@prayrequest` as a
-  reviewer, respond on `pull_request: [review_requested]`.
-  Underlying API supports this for any App; UI sidebar prominence
-  may stay Copilot-only. To be confirmed.
+  reviewer, respond on `pull_request: [review_requested]`. Underlying
+  API supports this for any App; UI sidebar prominence may stay
+  Copilot-only. To be confirmed.
 
-### v1 — Claude-powered matching (deferred until App distribution proven)
+### v1 — Claude-powered matching (next milestone)
 - Replace `pickVerse` in `app/src/verse-picker.ts` with a Claude API
-  call (full PR context: title + description + diff shape + signals)
+  call (full PR context: title + description + diff shape + signals).
 - Validate Claude's output against the curated verse JSON to guard
-  against hallucinated references; fall back to keyword matcher on
-  API failure or invalid response
-- Same surface (auto-bless, summon, reroll), smarter picks
-- The Action path likely stays keyword-only as the zero-secret
-  self-host option — flipping it to LLM would require users to set
-  `ANTHROPIC_API_KEY` in repo secrets, defeating the "drop in two
-  files" pitch.
+  against hallucinated references; fall back to the keyword matcher on
+  API failure or invalid response.
+- Same surface (auto-bless, summon, reroll), smarter picks.
+- Adds `ANTHROPIC_API_KEY` as a Cloudflare secret. Daily per-repo
+  comment cap (Cloudflare KV) lands here too.
 
 ### v3 — Polish (open-ended)
 - React-emoji feedback loop (👍/👎 → log to PostHog)
@@ -255,8 +240,11 @@ App is built.
 
 ## Sample Interactions
 
+> Each scenario assumes the author included `@prayrequest` in the PR
+> title or body to opt in. Without that, auto-bless is silent.
+
 ### Friday 6:47pm hotfix
-**PR:** `hotfix: payment gateway timeout (URGENT)` — +3 / −1, no tests
+**PR:** `@prayrequest hotfix: payment gateway timeout (URGENT)` — +3 / −1, no tests
 
 > > 人若賺得全世界，賠上自己的生命，有甚麼益處呢？
 > > — *馬太福音 16:26*
@@ -320,24 +308,17 @@ App is built.
    most "us" but verbose in comments.
 2. **Should it bless reviewers too, or only authors?** Reviewer-blessing is
    funnier but adds noise.
-3. **Self-host the LLM call vs use Anthropic API directly from the Action?**
-   Direct is simpler; self-hosted gives caching/rate-limit control.
-4. **App reviewer integration**: confirm `requested_reviewers` works for a
+3. **App reviewer integration**: confirm `requested_reviewers` works for a
    third-party App without Copilot-tier UI privileges. If yes, advertise
-   "add `@prayrequest` as a reviewer" as a first-class summon mode.
+   "add `@prayrequest` as a reviewer" as a first-class summon mode (and
+   solves the autocomplete-discoverability gap).
+4. **Marketplace listing**: keep private install (single-link) or publish
+   on the Marketplace for public discovery. Marketplace requires a verified
+   publisher, listing copy, screenshots, and a separate review process.
 
 ---
 
-## Tagline candidates (pick one for the repo README)
-
-- **"Every PR is a PrayRequest."** ← primary
-- **"Submit your PrayRequest."**
-- **"Where every PR comes with a prayer."**
-- **"PrayRequest — because `LGTM` won't save you."**
-- **"For when `LGTM` isn't enough."**
-- **「合併之前，先讀一段。」**
-
-### Comment format
+## Comment format
 
 ```
 > [verse]
@@ -350,12 +331,11 @@ App is built.
 
 ## Next Step
 
-v0 ✅ shipped (Action). v2 ✅ code-shipped (App at `app/`, no LLM yet).
-Next: deploy the App to Cloudflare, register the GitHub App entry,
-install on a test repo, and validate auto-bless / summon / reroll
-end-to-end. Setup checklist in [`app/README.md`](../app/README.md).
+v2 ✅ shipped — App is deployed, installed on this repo, auto-bless +
+summon + reroll all working end-to-end with the keyword matcher.
 
-Once distribution is proven, v1 layers in: swap the `pickVerse`
-keyword matcher in `app/src/verse-picker.ts` for a Claude API call
-with full PR context. The Action stays keyword-only so its
-zero-secret pitch survives.
+**Next is v1**: swap `pickVerse` in `app/src/verse-picker.ts` for a
+Claude API call with full PR context (title + description + diff shape
++ signals). Validate output against the curated JSON to guard against
+hallucinated references; fall back to the keyword matcher on API
+failure. Adds `ANTHROPIC_API_KEY` as a Cloudflare secret.

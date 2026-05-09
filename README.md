@@ -91,77 +91,19 @@ When *not* to use:
 
 ## Status
 
-The product is a hosted GitHub App, **PrayRequest** — install once at
-the org level, no workflow file, summon in any PR thread with
-`@prayrequest`. The App's display name keeps the "PrayRequest"
-casing; the @-mention slug is lowercased per GitHub convention and
-rendered as `@prayrequest[bot]`.
+PrayRequest is a hosted GitHub App. Install once at the org or user
+level — no workflow file in your repo — and summon in any PR thread
+with `@prayrequest`. The display name keeps "PrayRequest" casing; the
+@-mention slug is lowercased per GitHub convention as
+`@prayrequest[bot]`.
 
-- **v0 — Action PoC.** ✅ Shipped. Drop-in workflow, keyword-matched
-  against title, hardcoded verses. Auto-bless fires when `@prayrequest`
-  appears in PR title or body. Stays available as the self-host path.
-  See *Try it now (self-host)* below.
-- **v2 — Hosted App `@prayrequest`.** ✅ Code shipped, awaiting deploy.
-  Cloudflare Workers + TypeScript. Install once at org level, no
-  workflow file required. Auto-bless on PR open *if* `@prayrequest`
-  is in the title or body, `@prayrequest` summon in any PR comment,
-  `@prayrequest reroll` for an alternate. Verse-selection logic is
-  the same keyword matcher as v0 (no LLM yet).
-  Setup and deploy: [`app/README.md`](app/README.md).
-- **v1 — Claude-powered matching.** Deferred. Will replace the
-  keyword matcher in `app/src/verse-picker.ts` with a Claude API
-  call once App distribution is proven. Same surface, smarter picks.
-- **v3 — Polish.** Alternate quote sources (Tao Te Ching, Sun Tzu,
-  Shakespeare for non-religious teams), per-repo `prayrequest.yml`
-  config, verse-fatigue dampening, 👍/👎 reaction feedback loop,
-  daily comment cap, Marketplace listing.
+**Currently shipped (v2).** Cloudflare Workers + TypeScript. Auto-bless
+fires when `@prayrequest` is in the PR title or body. `@prayrequest`
+in any PR comment summons. `@prayrequest reroll` picks an alternate.
+Verse selection uses a keyword matcher; no LLM yet.
 
-Full design and rationale: [`docs/plan.md`](docs/plan.md).
-
----
-
-## Try It Now (self-host)
-
-If you don't want to install the hosted App, you can run the same
-keyword-matched logic as a self-hosted Action by dropping two files
-into your repo:
-
-```
-.github/
-├── workflows/prayrequest.yml
-└── prayrequest-verses.json
-```
-
-No API keys, no secrets, no GitHub App to register. The workflow posts
-via the default `GITHUB_TOKEN` and runs on `ubuntu-latest` with only
-`bash` and `jq` (preinstalled).
-
-Open a PR with `@prayrequest` in the title or body. The workflow fires
-on PR open and posts the verse. If the comment doesn't appear, check
-the Actions tab — the most common cause is `pull-requests: write`
-being disabled at the repo or org level.
-
-### Configure
-
-**Trigger.** Auto-bless is opt-in per PR: include `@prayrequest`
-anywhere in the title or body. PRs without it are ignored.
-
-**Skip bot PRs.** Already automatic. Dependabot, Renovate, and other
-`Bot`-type users don't trigger the workflow.
-
-**Customize verses.** Edit `.github/prayrequest-verses.json`. Each
-entry has `tags`, `verse`, and `ref`. Two rules to know:
-
-1. **JSON order is priority.** The first verse with any tag matching
-   the PR title (case-insensitive, word-boundary) wins. Put specific
-   tags like `security` and `hotfix` *before* generic ones like `feat`
-   and `fix`, otherwise `feat: add admin endpoint` matches `feat`
-   instead of `security` → `admin`.
-2. **The `massive` tag is auto-selected** when a PR has more than 500
-   additions or 20 changed files. Currently mapped to the refactor
-   verse.
-
-The `default` block at the bottom is the fallback when no tag matches.
+Setup and deploy: [`app/README.md`](app/README.md).
+Full roadmap and design rationale: [`docs/plan.md`](docs/plan.md).
 
 ---
 

@@ -12,9 +12,8 @@ interface VersesFile {
 
 const data = versesData as VersesFile;
 
-// Pre-compile each verse's tag patterns once. Mirrors the bash matcher:
-// (^|[^[:alnum:]])tag([^[:alnum:]]|$). JS \b includes _, so use an
-// explicit non-alnum class to keep parity with the shell script.
+// Word-boundary uses an explicit non-alnum class instead of \b because
+// \b counts _ as inside-word — `_fix_` would not match `\bfix\b`.
 const compiledVerses = data.verses.map((v) => ({
 	verse: v.verse,
 	ref: v.ref,
